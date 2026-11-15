@@ -1,5 +1,9 @@
 # Inventory Optimization Module for a Cloud-Based Hotel Management System
 
+[![CI](https://github.com/Pradipd1/hotel-inventory-optimization/actions/workflows/ci.yml/badge.svg)](https://github.com/Pradipd1/hotel-inventory-optimization/actions/workflows/ci.yml)
+
+**Live demo:** https://hotel-inventory-optimization.vercel.app (demo accounts below)
+
 A full-stack web application that tracks hotel inventory in real time and recommends **what to order, how much, and when**, using explainable inventory-management formulas applied to the hotel's own consumption data.
 
 Built as a standalone module (React + Express + MongoDB) that can later be plugged into a larger cloud hotel management system. All data is scoped by `hotelId`, so the same deployment can serve many hotels.
@@ -15,7 +19,7 @@ Built as a standalone module (React + Express + MongoDB) that can later be plugg
 3. [Architecture](#architecture)
 4. [Getting started](#getting-started)
 5. [Environment variables](#environment-variables)
-6. [Deployment (Vercel + Render + MongoDB Atlas)](#deployment-vercel--render--mongodb-atlas)
+6. [Deployment (Vercel + MongoDB Atlas)](#deployment-vercel--mongodb-atlas)
 7. [Demo accounts and sample data](#demo-accounts-and-sample-data)
 8. [Optimization algorithms](#optimization-algorithms)
 9. [API reference](#api-reference)
@@ -128,25 +132,28 @@ Useful individual commands:
 | `CLIENT_ORIGIN` | no | `http://localhost:5173` | Comma-separated list of origins allowed by CORS |
 | `ALERT_SCAN_INTERVAL_MINUTES` | no | `60` | How often expiry/stock alerts are re-evaluated |
 | `BCRYPT_ROUNDS` | no | `12` | bcrypt cost factor |
-| `CLOUDINARY_URL` | on Render | empty (local disk) | `cloudinary://<api_key>:<api_secret>@<cloud_name>`. When set, item images are stored in Cloudinary instead of `server/uploads/` |
-| `TRUST_PROXY` | no | empty (off) | Number of reverse proxies in front of the API (e.g. `1` on Render, Railway or behind Nginx) so rate limiting sees real client IPs |
+| `IMAGE_STORAGE` | no | `disk` | `database` stores item images in MongoDB (used on Vercel, which has no persistent disk) |
+| `CLOUDINARY_URL` | no | empty | Optional alternative image store: `cloudinary://<api_key>:<api_secret>@<cloud_name>` |
+| `CRON_SECRET` | on Vercel | empty | Bearer secret for the scheduled `/api/cron/alert-scan` endpoint |
+| `TRUST_PROXY` | no | empty (off) | Number of reverse proxies in front of the API (e.g. `1` on Vercel or behind Nginx) so rate limiting sees real client IPs |
 
 `client/.env` (optional; see `client/.env.example`): `VITE_API_URL` (default `/api`) and `VITE_SHOW_DEMO_ACCOUNTS` (set to `false` to hide the demo shortcuts on the login page). No secrets are stored in the frontend.
 
-## Deployment (Vercel + Render + MongoDB Atlas)
+## Deployment (Vercel + MongoDB Atlas)
 
-> **Current live deployment:** https://hotel-inventory-optimization.vercel.app. The frontend and the API run together as one Vercel project (root `vercel.json` + `api/index.mjs`, functions in the Mumbai region `bom1`), with MongoDB Atlas (Mumbai) as the database and item images stored in MongoDB (`IMAGE_STORAGE=database`). Vercel environment variables: `MONGO_URI`, `JWT_SECRET`, `CRON_SECRET`, `NODE_ENV=production`, `IMAGE_STORAGE=database`, `TRUST_PROXY=1`, `JWT_EXPIRES_IN=8h`, `VITE_SHOW_DEMO_ACCOUNTS=true`. A daily Vercel Cron job calls `/api/cron/alert-scan`. The steps below describe the alternative split setup (Render API + Vercel frontend + Cloudinary).
+The live site runs as **one Vercel project**: the React build is served as static files and the Express API runs as a serverless function on the same domain, so no CORS configuration is needed.
 
-| Part | Host | Config in this repo |
+| Part | Where | Config |
 |---|---|---|
-| Frontend (React build) | Vercel, root directory `client` | `client/vercel.json` (SPA rewrites so deep links like `/inventory` work on refresh) |
-| API (Express) | Render web service, root directory `server` | `render.yaml` (Blueprint: build, start, health check, env vars) |
-| Database | MongoDB Atlas (replica set, so transactions work) | `MONGO_URI` |
-| Item images | Cloudinary | `CLOUDINARY_URL` (Render's disk is wiped on every deploy) |
+| Frontend | Vercel static hosting | `vercel.json` (build command, SPA rewrites) |
+| API | Vercel serverless function, Mumbai region (`bom1`) | `api/index.mjs` wraps `server/app.js` with a cached DB connection |
+| Database | MongoDB Atlas M0, Mumbai (replica set, so transactions work) | `MONGO_URI` |
+| Item images | MongoDB (`ImageFile` collection), served at `/api/images/:id` | `IMAGE_STORAGE=database` |
+| Expiry/stock alert scan | Vercel Cron, daily | `/api/cron/alert-scan` with `CRON_SECRET` |
 
-**Order of steps**
+**Deploying your own copy**
 
-1. **MongoDB Atlas**: create a free M0 cluster, a database user, and allow network access from `0.0.0.0/0` (Render's free tier has no fixed IP). Copy the `mongodb+srv://...` connection string and add the database name: `.../hotel_inventory?retryWrites=true&w=majority`.
+1. **MongoDB Atlas**: create a free M0 cluster, a database user, and allow network access from `0.0.0.0/0` (Vercel functions have no fixed IP). Copy the connection string and add the database name: `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/hotel_inventory?retryWrites=true&w=majority`.
 2. **Load the demo data into Atlas** from your computer (the seed refuses to run when `NODE_ENV=production`):
    ```powershell
    cd server
@@ -154,13 +161,21 @@ Useful individual commands:
    npm run seed
    Remove-Item Env:MONGO_URI
    ```
-3. **Cloudinary**: create a free account and copy the *API environment variable* (`cloudinary://...`).
-4. **Render**: New → Blueprint → select this repository (it reads `render.yaml`). Enter `MONGO_URI`, `CLOUDINARY_URL`, and for now `CLIENT_ORIGIN=https://placeholder.vercel.app`. `JWT_SECRET` is generated automatically. Wait for the deploy, then open `https://<service>.onrender.com/api/health`: it must show `"database":"connected"`.
-5. **Vercel**: Add New → Project → import this repository, set **Root Directory** to `client`, and add the environment variable `VITE_API_URL=https://<service>.onrender.com/api` (and `VITE_SHOW_DEMO_ACCOUNTS=true` to keep the demo shortcuts). Deploy.
-6. **Back on Render**: set `CLIENT_ORIGIN` to the Vercel production URL (e.g. `https://hotel-inventory.vercel.app`, no trailing path) and save. Render redeploys automatically.
-7. Open the Vercel URL and sign in with a demo account.
+3. **Vercel**: Add New → Project → import this repository (root directory: the repository root). Set the function region to Mumbai (Settings → Functions) and add these environment variables:
 
-Notes: Render's free instance sleeps after about 15 minutes without traffic, so the first request after a pause can take up to a minute. `VITE_API_URL` is baked in at build time, so redeploy the Vercel project after changing it. With demo accounts shown publicly, anyone can sign in as the demo admin; re-run step 2 to reset the data.
+   | Variable | Value |
+   |---|---|
+   | `MONGO_URI` | your Atlas connection string |
+   | `JWT_SECRET` | `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
+   | `CRON_SECRET` | another random value |
+   | `NODE_ENV` | `production` |
+   | `IMAGE_STORAGE` | `database` |
+   | `TRUST_PROXY` | `1` |
+   | `VITE_SHOW_DEMO_ACCOUNTS` | `true` to show the demo shortcuts on the login page |
+
+4. Deploy, then open `https://<project>.vercel.app/api/health`: it must show `"database":"connected"`.
+
+With demo accounts shown publicly, anyone can sign in as the demo admin; re-run step 2 to reset the data. To host the API elsewhere instead (Render, Railway, a VPS), run `node server/server.js` with the same variables, set `CLIENT_ORIGIN` to the frontend URL and build the client with `VITE_API_URL=https://<api-host>/api`.
 
 ## Demo accounts and sample data
 
@@ -364,13 +379,16 @@ Development also included an end-to-end check through the Vite proxy, plus a hea
 ## Project structure
 
 ```
+├── .github/workflows/ci.yml # tests + build on every push
+├── vercel.json             # Vercel build, rewrites, function region, daily cron
+├── api/index.mjs           # Vercel serverless entry for the Express API
 ├── package.json            # root scripts (install:all, db, seed, dev, test, build)
 ├── server/
 │   ├── server.js           # bootstrap: DB connection, HTTP server, background alert scan
 │   ├── app.js              # Express app (middleware, routes, error handling)
 │   ├── config/             # env loading, MongoDB connection, transaction detection
 │   ├── models/             # Hotel, User, Category, Supplier, InventoryItem, StockMovement,
-│   │                       # ConsumptionRecord, PurchaseOrder, Notification, AuditLog, Counter
+│   │                       # ConsumptionRecord, PurchaseOrder, Notification, AuditLog, Counter, ImageFile
 │   ├── middleware/         # auth (JWT + roles), validate (Zod), sanitize, upload, errorHandler
 │   ├── validators/         # Zod schemas per module
 │   ├── controllers/        # thin request handlers
