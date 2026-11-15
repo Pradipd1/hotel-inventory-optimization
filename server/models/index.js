@@ -1,0 +1,11 @@
+export { Hotel } from './Hotel.js';
+export { User } from './User.js';
+export { Category } from './Category.js';
+export { Supplier } from './Supplier.js';
+export { InventoryItem } from './InventoryItem.js';
+export { StockMovement } from './StockMovement.js';
+export { ConsumptionRecord } from './ConsumptionRecord.js';
+export { PurchaseOrder } from './PurchaseOrder.js';
+export { Notification } from './Notification.js';
+export { AuditLog } from './AuditLog.js';
+export { Counter, nextReference } from './Counter.js';

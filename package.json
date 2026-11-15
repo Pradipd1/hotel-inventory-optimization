@@ -1,0 +1,17 @@
+{
+  "name": "hotel-inventory-optimization",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Inventory Optimization Module for a Cloud-Based Hotel Management System",
+  "scripts": {
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "db": "npm --prefix server run db:start",
+    "seed": "npm --prefix server run seed",
+    "dev": "concurrently -n api,web -c blue,green \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "test": "npm --prefix server test",
+    "build": "npm --prefix client run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.5"
+  }
+}
