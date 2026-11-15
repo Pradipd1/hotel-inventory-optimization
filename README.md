@@ -135,6 +135,8 @@ Useful individual commands:
 
 ## Deployment (Vercel + Render + MongoDB Atlas)
 
+> **Current live deployment:** https://hotel-inventory-optimization.vercel.app. The frontend and the API run together as one Vercel project (root `vercel.json` + `api/index.mjs`, functions in the Mumbai region `bom1`), with MongoDB Atlas (Mumbai) as the database and item images stored in MongoDB (`IMAGE_STORAGE=database`). Vercel environment variables: `MONGO_URI`, `JWT_SECRET`, `CRON_SECRET`, `NODE_ENV=production`, `IMAGE_STORAGE=database`, `TRUST_PROXY=1`, `JWT_EXPIRES_IN=8h`, `VITE_SHOW_DEMO_ACCOUNTS=true`. A daily Vercel Cron job calls `/api/cron/alert-scan`. The steps below describe the alternative split setup (Render API + Vercel frontend + Cloudinary).
+
 | Part | Host | Config in this repo |
 |---|---|---|
 | Frontend (React build) | Vercel, root directory `client` | `client/vercel.json` (SPA rewrites so deep links like `/inventory` work on refresh) |
