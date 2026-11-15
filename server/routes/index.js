@@ -24,6 +24,10 @@ const byId = validate({ params: idParams });
 
 const router = Router();
 router.use('/auth', authRoutes);
+// Public: <img> tags cannot send the Bearer token. Ids are random ObjectIds; images are item photos only.
+router.get('/images/:id', byId, admin.serveImage);
+// Scheduled alert scan (Vercel Cron or any scheduler), protected by CRON_SECRET.
+router.get('/cron/alert-scan', admin.cronAlertScan);
 router.use(authenticate);
 
 // Dashboard

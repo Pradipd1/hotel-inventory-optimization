@@ -7,7 +7,7 @@ const ALLOWED = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.web
 
 // With Cloudinary configured the file is kept in memory and streamed to Cloudinary;
 // otherwise it is written to the local uploads folder.
-const storage = env.cloudinaryUrl
+const storage = env.imageStorage !== 'disk'
   ? multer.memoryStorage()
   : multer.diskStorage({
       destination: env.uploadDir,

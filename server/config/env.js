@@ -45,6 +45,10 @@ export const env = Object.freeze({
   // Optional. When set (cloudinary://<key>:<secret>@<cloud_name>), item images are stored in
   // Cloudinary instead of the local uploads folder, which is needed on hosts with ephemeral disks.
   cloudinaryUrl: process.env.CLOUDINARY_URL || '',
+  // Where item images go: cloudinary (if CLOUDINARY_URL is set), database (MongoDB), or disk (server/uploads).
+  imageStorage: process.env.CLOUDINARY_URL ? 'cloudinary' : process.env.IMAGE_STORAGE === 'database' ? 'database' : 'disk',
+  // Shared secret for the scheduled alert scan endpoint (Vercel Cron sends it as a Bearer token).
+  cronSecret: process.env.CRON_SECRET || '',
   uploadDir: path.join(serverRoot, 'uploads'),
   serverRoot,
 });

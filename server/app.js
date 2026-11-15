@@ -17,16 +17,24 @@ export function createApp() {
 
   // Images are served to the client origin, so allow cross-origin resource loading.
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  const corsBase = {
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Content-Disposition'],
+  };
   app.use(
-    cors({
-      origin(origin, cb) {
-        // Requests without an Origin header (curl, server-to-server, same-origin proxy) are allowed.
-        if (!origin || env.clientOrigins.includes(origin)) return cb(null, true);
-        return cb(new ApiError(403, `Origin ${origin} is not allowed by CORS`));
-      },
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-      exposedHeaders: ['Content-Disposition'],
+    cors((req, cb) => {
+      const origin = req.headers.origin;
+      let sameOrigin = false;
+      try {
+        sameOrigin = Boolean(origin) && new URL(origin).host === req.headers.host;
+      } catch {
+        sameOrigin = false;
+      }
+      // Allowed: no Origin (curl, server-to-server), the same site (frontend and API on one domain),
+      // or an origin listed in CLIENT_ORIGIN (frontend hosted separately).
+      if (!origin || sameOrigin || env.clientOrigins.includes(origin)) return cb(null, { ...corsBase, origin: true });
+      return cb(new ApiError(403, `Origin ${origin} is not allowed by CORS`));
     })
   );
   app.use(express.json({ limit: '1mb' }));
@@ -42,7 +50,7 @@ export function createApp() {
     });
   });
 
-  fs.mkdirSync(env.uploadDir, { recursive: true });
+  if (env.imageStorage === 'disk') fs.mkdirSync(env.uploadDir, { recursive: true });
   app.use('/uploads', express.static(env.uploadDir, { maxAge: '7d', index: false }));
 
   app.use('/api', routes);

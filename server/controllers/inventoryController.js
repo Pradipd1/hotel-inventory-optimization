@@ -6,7 +6,7 @@ import { ApiError } from '../utils/ApiError.js';
 import { pageMeta, paginate } from '../utils/helpers.js';
 import { audit } from '../services/auditService.js';
 import * as inventory from '../services/inventoryService.js';
-import { deleteImage, uploadImageBuffer } from '../services/imageStorage.js';
+import { deleteDatabaseImage, deleteImage, saveImageToDatabase, uploadImageBuffer } from '../services/imageStorage.js';
 
 export async function list(req, res) {
   const result = await inventory.listItems(req.user, req.validated.query);
@@ -68,10 +68,13 @@ export async function uploadImage(req, res) {
   }
   const old = item.image;
   const oldPublicId = item.imagePublicId;
-  if (env.cloudinaryUrl) {
+  if (env.imageStorage === 'cloudinary') {
     const uploaded = await uploadImageBuffer(req.file.buffer, String(req.user.hotelId));
     item.image = uploaded.url;
     item.imagePublicId = uploaded.publicId;
+  } else if (env.imageStorage === 'database') {
+    item.image = (await saveImageToDatabase(req.file, req.user.hotelId)).url;
+    item.imagePublicId = null;
   } else {
     item.image = `/uploads/${req.file.filename}`;
     item.imagePublicId = null;
@@ -79,6 +82,7 @@ export async function uploadImage(req, res) {
   item.updatedBy = req.user.id;
   await item.save();
   if (oldPublicId) await deleteImage(oldPublicId);
+  if (old?.startsWith('/api/images/')) await deleteDatabaseImage(old);
   if (old?.startsWith('/uploads/')) await fs.unlink(path.join(env.uploadDir, path.basename(old))).catch(() => {});
   await audit(req, { action: 'item.image', entityType: 'InventoryItem', entityId: item._id, summary: `Updated image for ${item.name}` });
   res.json({ success: true, data: { image: item.image }, message: 'Image uploaded' });

@@ -9,3 +9,4 @@ export { PurchaseOrder } from './PurchaseOrder.js';
 export { Notification } from './Notification.js';
 export { AuditLog } from './AuditLog.js';
 export { Counter, nextReference } from './Counter.js';
+export { ImageFile } from './ImageFile.js';

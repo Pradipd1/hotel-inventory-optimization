@@ -1,8 +1,9 @@
-import { AuditLog, Category, Hotel, Notification, User } from '../models/index.js';
+import { AuditLog, Category, Hotel, ImageFile, Notification, User } from '../models/index.js';
+import { env } from '../config/env.js';
 import { ApiError } from '../utils/ApiError.js';
 import { escapeRegex, pageMeta, paginate } from '../utils/helpers.js';
 import { audit } from '../services/auditService.js';
-import { scanHotelAlerts } from '../services/alertService.js';
+import { scanAllHotels, scanHotelAlerts } from '../services/alertService.js';
 
 // ---------- Users (admin) ----------
 async function assertCategories(hotelId, ids = []) {
@@ -177,4 +178,19 @@ export async function listAuditLogs(req, res) {
     AuditLog.countDocuments(filter),
   ]);
   res.json({ success: true, data: rows, meta: pageMeta(total, { page, limit }) });
+}
+
+// ---------- Public image + scheduled jobs ----------
+export async function serveImage(req, res) {
+  const img = await ImageFile.findById(req.validated.params.id).lean();
+  if (!img) throw ApiError.notFound('Image not found');
+  res.set('Content-Type', img.contentType);
+  res.set('Cache-Control', 'public, max-age=604800, immutable');
+  res.send(img.data.buffer ? Buffer.from(img.data.buffer) : img.data);
+}
+
+export async function cronAlertScan(req, res) {
+  if (!env.cronSecret || req.headers.authorization !== `Bearer ${env.cronSecret}`) throw ApiError.unauthorized();
+  const result = await scanAllHotels();
+  res.json({ success: true, result });
 }
